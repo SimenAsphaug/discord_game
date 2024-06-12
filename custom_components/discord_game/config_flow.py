@@ -24,13 +24,6 @@ AUTH_SCHEMA = vol.Schema(
     }
 )
 
-client = nextcord.Client(intents=nextcord.Intents.all())
-members = {}
-userNames = []
-channels = {}
-channelNames = []
-
-
 class DiscordGameConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     data: Optional[Dict[str, Any]]
 
@@ -38,7 +31,7 @@ class DiscordGameConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         errors: Dict[str, str] = {}
         if user_input is not None:
             try:
-                await validate_auth_and_fetch_data(user_input[CONF_ACCESS_TOKEN])
+                await self.validate_auth_and_fetch_data(user_input[CONF_ACCESS_TOKEN])
             except ValueError:
                 errors["base"] = "auth"
             if not errors:
@@ -70,9 +63,9 @@ class DiscordGameConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
         errors: Dict[str, str] = {}
         if user_input is not None:
-            for user in user_input.get(CONF_MEMBERS):
+            for user in user_input.get(CONF_MEMBERS, []):
                 self.data[CONF_MEMBERS].append(members.get(user).id)
-            if user_input.get(CONF_CHANNELS) is not None and len(user_input.get(CONF_CHANNELS)) > 0:
+            if user_input.get(CONF_CHANNELS):
                 for channel in user_input.get(CONF_CHANNELS):
                     self.data[CONF_CHANNELS].append(channels.get(channel).id)
 
@@ -82,36 +75,33 @@ class DiscordGameConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             step_id="members", data_schema=_MEMBERS_SCHEMA, errors=errors
         )
 
-
-async def validate_auth_and_fetch_data(token: str) -> None:
-    global client
-    client = nextcord.Client(intents=nextcord.Intents.all())
-    try:
-        await client.login(token)
-        guilds = await client.fetch_guilds().flatten()
-        _LOGGER.debug("guilds: %s", guilds)
-        global members
-        for guild in guilds:
-            _members = await guild.fetch_members().flatten()
-            for member in _members:
-                members[member.name] = member
-        global channels
-        for guild in guilds:
-            _channels = await guild.fetch_channels()
-            for channel in _channels:
-                channels[channel.name] = channel
-        global userNames
-        _LOGGER.debug("members: %s", members)
-        for member in members.values():
-            userNames.append(member.name)
-            userNames = list(dict.fromkeys(userNames))
-        _LOGGER.debug("userNames: %s", userNames)
-        global channelNames
-        _LOGGER.debug("channels: %s", channels)
-        for channel in channels.values():
-            channelNames.append(channel.name)
-            channelNames = list(dict.fromkeys(channelNames))
-        _LOGGER.debug("channelNames: %s", channelNames)
-        await client.close()
-    except LoginFailure:
-        raise ValueError
+    async def validate_auth_and_fetch_data(self, token: str) -> None:
+        global client
+        client = nextcord.Client(intents=nextcord.Intents.all())
+        global members, userNames, channels, channelNames
+        members = {}
+        userNames = []
+        channels = {}
+        channelNames = []
+        try:
+            await client.login(token)
+            guilds = await client.fetch_guilds().flatten()
+            _LOGGER.debug("guilds: %s", guilds)
+            for guild in guilds:
+                _members = await guild.fetch_members().flatten()
+                for member in _members:
+                    members[member.name] = member
+            for guild in guilds:
+                _channels = await guild.fetch_channels()
+                for channel in _channels:
+                    channels[channel.name] = channel
+            userNames = list(dict.fromkeys([member.name for member in members.values()]))
+            channelNames = list(dict.fromkeys([channel.name for channel in channels.values()]))
+            _LOGGER.debug("userNames: %s", userNames)
+            _LOGGER.debug("channelNames: %s", channelNames)
+            await client.close()
+        except LoginFailure:
+            raise ValueError
+        except Exception as e:
+            _LOGGER.error("Unexpected error: %s", e)
+            raise ValueError
