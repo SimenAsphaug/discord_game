@@ -24,7 +24,7 @@ class DiscordGameConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         errors: Dict[str, str] = {}
         if user_input is not None:
             try:
-                await self.validate_auth(user_input[CONF_ACCESS_TOKEN])
+                await self.validate_auth_and_fetch_data(user_input[CONF_ACCESS_TOKEN])
             except ValueError:
                 errors["base"] = "auth"
             if not errors:
@@ -34,10 +34,15 @@ class DiscordGameConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             step_id="user", data_schema=AUTH_SCHEMA, errors=errors
         )
 
-    async def validate_auth(self, token: str) -> None:
+    async def validate_auth_and_fetch_data(self, token: str) -> None:
         client = nextcord.Client(intents=nextcord.Intents.all())
         try:
             await client.login(token)
+            guilds = await client.fetch_guilds().flatten()
+            _LOGGER.debug("guilds: %s", guilds)
             await client.close()
         except LoginFailure:
+            raise ValueError
+        except Exception as e:
+            _LOGGER.error("Unexpected error: %s", e)
             raise ValueError
