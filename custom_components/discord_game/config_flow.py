@@ -44,6 +44,12 @@ class DiscordGameConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         )
 
     async def async_step_members(self, user_input: Optional[Dict[str, Any]] = None):
+        global userNames, channelNames
+
+        _LOGGER.debug("Starting async_step_members")
+        _LOGGER.debug("userNames: %s", userNames)
+        _LOGGER.debug("channelNames: %s", channelNames)
+
         _MEMBERS_SCHEMA = vol.Schema(
             {
                 vol.Optional(CONF_MEMBERS): selector.SelectSelector(
@@ -61,6 +67,7 @@ class DiscordGameConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
         errors: Dict[str, str] = {}
         if user_input is not None:
+            _LOGGER.debug("Received user input: %s", user_input)
             for user in user_input.get(CONF_MEMBERS, []):
                 self.data[CONF_MEMBERS].append(members.get(user).id)
             if user_input.get(CONF_CHANNELS):
