@@ -40,6 +40,25 @@ class DiscordGameConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             await client.login(token)
             guilds = await client.fetch_guilds().flatten()
             _LOGGER.debug("guilds: %s", guilds)
+
+            members = {}
+            userNames = []
+            for guild in guilds:
+                _members = await guild.fetch_members().flatten()
+                for member in _members:
+                    members[member.name] = member
+            userNames = list(dict.fromkeys([member.name for member in members.values()]))
+            _LOGGER.debug("userNames: %s", userNames)
+
+            channels = {}
+            channelNames = []
+            for guild in guilds:
+                _channels = await guild.fetch_channels()
+                for channel in _channels:
+                    channels[channel.name] = channel
+            channelNames = list(dict.fromkeys([channel.name for channel in channels.values()]))
+            _LOGGER.debug("channelNames: %s", channelNames)
+
             await client.close()
         except LoginFailure:
             raise ValueError
